@@ -1,0 +1,78 @@
+#!/usr/bin/env python3
+import uuid
+import socket
+from datetime import datetime
+
+# Time operations in python
+# timestamp = datetime.fromisoformat(isotimestring)
+
+# Extract local MAC address [DO NOT CHANGE]
+MAC = ":".join(["{:02x}".format((uuid.getnode() >> ele) & 0xFF) for ele in range(0, 8 * 6, 8)][::-1]).upper()
+
+# SERVER IP AND PORT NUMBER [DO NOT CHANGE VAR NAMES]
+SERVER_IP = "10.0.0.100"
+SERVER_PORT = 9000
+
+
+clientSocket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+
+# Sending DISCOVER message
+message = "DISCOVER " + MAC
+clientSocket.sendto(message.encode(), (SERVER_IP, SERVER_PORT))
+
+while True:
+    # LISTENING FOR RESPONSE
+    response, _ = clientSocket.recvfrom(4096)
+    response_parts = response.decode().split()
+
+    # Handle different responses from the server
+    if response_parts[0] == "DECLINE":
+        print("server: Your request has been declined.")
+
+    elif response_parts[0] == "OFFER":
+        print(f"server: Offer received. IP Address: {response_parts[2]}")
+        # Prompt user to choose whether to accept the offer, send REQUEST, etc.
+
+    elif response_parts[0] == "ACKNOWLEDGE":
+        print(f"server: Acknowledgment received. IP Address: {response_parts[2]}, Expires at: {response_parts[3]}")
+        # Continue with client menu, renew, release, or quit
+
+    # If the server responds with a list of records
+    elif response_parts[0] == "LIST":
+        # Process and display the list of records received from the server
+        print(response[5:])  
+
+    # If the server notifies that an IP address has been released
+    elif response_parts[0] == "RELEASE":
+        print(f"server: IP {response_parts[2]} released for {MAC}")
+ 
+    # If the server acknowledges a renewal request
+    elif response_parts[0] == "RENEW":
+        print(f"server: Renewal received. IP Address: {response_parts[2]}, Expires at: {response_parts[3]}")
+ 
+    # Sample Menu:
+    print("client: Menu\n1. Release\n2. Renew\n3. Quit")
+    choice = input("Choose an option (1/2/3): ")
+
+    if choice == "1":
+        # Send RELEASE message
+        release_message = f"RELEASE {MAC} {response_parts[2]} {response_parts[3]}"
+        clientSocket.sendto(release_message.encode(), (SERVER_IP, SERVER_PORT))
+        print("client: Release message sent.")
+
+    elif choice == "2":
+        # Send RENEW message
+        renew_message = f"RENEW {MAC} {response_parts[2]} {response_parts[3]}"
+        clientSocket.sendto(renew_message.encode(), (SERVER_IP, SERVER_PORT))
+        print("client: Renew message sent.")
+
+    elif choice == "3":
+        # Send QUIT message 
+        quit_message = "QUIT"
+        clientSocket.sendto(quit_message.encode(), (SERVER_IP, SERVER_PORT))
+        print("client: Quitting.")
+        break
+
+    else:
+        print("client: Invalid choice. Please choose 1, 2, or 3.")
+
